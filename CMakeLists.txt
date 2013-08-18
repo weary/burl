@@ -13,7 +13,15 @@ add_library(http_parser http-parser/http_parser.c)
 
 include_directories(reass)
 
-add_executable(burl burl.cpp)
+add_library(burl
+	burl.cpp
+	packet_listener.cpp
+	stream.cpp
+	request_response.cpp
+	)
 target_link_libraries(burl reass)
 target_link_libraries(burl http_parser)
+
+add_executable(burl_test burl_test.cpp)
+target_link_libraries(burl_test burl)
 
