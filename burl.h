@@ -10,11 +10,11 @@
 
 struct burl_t : public boost::noncopyable
 {
-	burl_t(page_container_t *container);
+	burl_t(request_listener_t *container);
 	~burl_t();
 
 	void read_pcap(const std::string &filename, const std::string &bpf);
-	void read_live_capture(const std::string &device, const std::string &bpf);
+	void live_capture(const std::string &device, const std::string &bpf);
 
 	// to stop read_live_capture. will probably not stop until next packet is received
 	void quit() { d_quit = true; }

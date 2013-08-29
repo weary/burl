@@ -16,7 +16,7 @@ struct packet_t;
 // burl forwards
 struct burl_settings_t;
 struct tcp_stream_t;
-class page_container_t;
+class request_listener_t;
 
 // one side of a tcp-connection
 struct stream_t :
@@ -26,7 +26,7 @@ struct stream_t :
 			tcp_stream_t *stream,
 			burl_settings_t *burlsettings,
 			http_parser_settings *parsersettings,
-			page_container_t *container);
+			request_listener_t *container);
 
 	~stream_t();
 
@@ -47,9 +47,14 @@ protected:
 
 	unsigned d_streamid; // counter for tcp-streams. same for initiator and responder
 
-	page_container_t *d_container;
+	request_listener_t *d_container;
 
-	bool d_broken;
+	struct timeval d_now;
+
+	bool d_broken = false;
+	enum { stream_unknown, stream_partial, stream_ok } d_stream_state = stream_unknown;
+	// partial means we missed packets somewhere
+
 	std::string d_field; // for http-headers
 
 	request_ptr d_current_request;

@@ -3,22 +3,23 @@
 #include "packet_listener.h"
 #include "http-parser/http_parser.h"
 #include "reass/tcp_reassembler.h"
+#include <netinet/tcp.h>
 
 stream_t::stream_t(
 		tcp_stream_t *stream,
 		burl_settings_t *burlsettings,
 		http_parser_settings *parsersettings,
-		page_container_t *container) :
+		request_listener_t *container) :
 	d_burlsettings(burlsettings),
 	d_httpsettings(parsersettings),
-	d_container(container),
-	d_broken(false)
+	d_container(container)
 {
 	d_parser = new http_parser;
 	reset_http_parser();
+
+	static unsigned new_stream_id = 0;
 	if (stream->have_partner())
 	{
-		static unsigned new_stream_id = 0;
 		stream_t *partner = reinterpret_cast<stream_t *>(
 				stream->partner()->userdata());
 		if (partner)
@@ -26,6 +27,8 @@ stream_t::stream_t(
 		else
 			d_streamid = new_stream_id++;
 	}
+	else
+		d_streamid = new_stream_id++;
 }
 
 stream_t::~stream_t()
@@ -42,13 +45,32 @@ stream_t::~stream_t()
 
 void stream_t::accept_packet(packet_t *packet, int packetloss)
 {
+	if (packet)
+	{
+		printf("stream %d: have packet %d.%06d\n", d_streamid, (unsigned)packet->ts().tv_sec, (unsigned)packet->ts().tv_usec);
+		if (packet->ts().tv_usec == 75494)
+			printf("stream %d: frut\n", d_streamid);
+	}
 	if (d_broken)
 		return;
 
 	if (packet)
 	{
+		if (d_stream_state == stream_unknown)
+		{
+			const layer_t *tcplayer = packet->layer(-1);
+			while (tcplayer && tcplayer->type() != layer_tcp)
+				tcplayer = packet->prev(tcplayer);
+			assert(tcplayer);
+			d_stream_state = (reinterpret_cast<const tcphdr *>(tcplayer->data())->syn ?
+					stream_ok : stream_partial);
+		}
+		if (packetloss)
+			d_stream_state = stream_partial;
+
+		d_now = packet->ts();
 		layer_t *toplayer = packet->layer(-1);
-		if (!toplayer || toplayer->type() != layer_data)
+		if (!toplayer || toplayer->type() != layer_data || !toplayer->size())
 			return;
 
 		size_t nparsed = http_parser_execute(
@@ -58,14 +80,13 @@ void stream_t::accept_packet(packet_t *packet, int packetloss)
 				toplayer->size());
 
 		if (d_parser->upgrade)
-			d_broken = true; // cannot parse this
+			d_broken = true;  // cannot parse this
 		else if (nparsed != toplayer->size())
 		{
 			if (d_burlsettings->it_really_is_http)
 				reset_http_parser(); // try if we can restart the next packet
 			else {
-				printf("failed to parse http in %s\n", 
-						boost::lexical_cast<std::string>(*packet).c_str());
+				//printf("failed to parse http in %s\n", boost::lexical_cast<std::string>(*packet).c_str());
 				d_broken = true;
 			}
 		}
@@ -76,8 +97,7 @@ void stream_t::accept_packet(packet_t *packet, int packetloss)
 				d_parser, d_httpsettings, nullptr, 0);
 		if (nparsed != 0)
 		{
-			printf("failed to parse http at end of stream in %s\n", 
-					boost::lexical_cast<std::string>(*packet).c_str());
+			//printf("failed to parse http at end of stream in %s\n", boost::lexical_cast<std::string>(*packet).c_str());
 			// so we are broken. but last packet anyway
 		}
 	}
@@ -135,17 +155,19 @@ int stream_t::on_message_begin()
 
 int stream_t::on_message_complete()
 {
+	request_or_response_t *c = cur();
+	c->complete = true;
+	c->tcp_stream_ok = d_stream_state == stream_ok;
+
 	if (is_request())
 	{
 		assert(!d_current_response && d_current_request);
-		d_current_request->complete = true;
 		d_container->add_request(d_current_request);
 		d_current_request.reset();
 	}
 	else
 	{
 		assert(d_current_response && !d_current_request);
-		d_current_response->complete = true;
 		d_container->add_response(d_current_response);
 		d_current_response.reset();
 	}
@@ -180,11 +202,8 @@ request_t *stream_t::req()
 {
 	assert(is_request());
 	if (!d_current_request)
-	{
-		d_current_request.reset(new request_t);
-		d_current_request->method = (http_method)d_parser->method;
-		d_current_request->tcp_streamid = d_streamid;
-	}
+		d_current_request.reset(new request_t(
+					d_now, d_streamid, d_parser->method));
 	return d_current_request.get();
 }
 
@@ -192,10 +211,8 @@ response_t *stream_t::res()
 {
 	assert(!is_request());
 	if (!d_current_response)
-	{
-		d_current_response.reset(new response_t);
-		d_current_response->tcp_streamid = d_streamid;
-	}
+		d_current_response.reset(new response_t(
+					d_now, d_streamid));
 	return d_current_response.get();
 }
 

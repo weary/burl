@@ -21,12 +21,12 @@ FORWARD_NOTIFICATION(on_message_complete)
 
 burl_packet_listener_t::burl_packet_listener_t(
 		burl_settings_t *burlsettings,
-		page_container_t *out) :
+		request_listener_t *out) :
 	d_burlsettings(burlsettings),
 	d_container(out), d_packetloss(0)
 {
 	d_httpsettings = new http_parser_settings;
-	::memset(d_httpsettings, 0, sizeof(d_httpsettings));
+	::memset(d_httpsettings, 0, sizeof(http_parser_settings));
 	d_httpsettings->on_url = ::on_url;
 	d_httpsettings->on_url = ::on_url;
 	d_httpsettings->on_header_field = ::on_header_field;
@@ -74,5 +74,5 @@ void burl_packet_listener_t::accept_tcp(packet_t *packet, int packetloss, tcp_st
 
 void burl_packet_listener_t::accept_error(packet_t *packet, const char *error)
 {
-	throw format_exception("error parsing packet '%s': %s", to_str(*packet).c_str(), error);
+	throw format_exception("error parsing packet '%s': %s. tip: specify 'tcp' in your bpf", to_str(*packet).c_str(), error);
 }

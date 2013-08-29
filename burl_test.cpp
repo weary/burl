@@ -3,7 +3,7 @@
 #include <list>
 #include "shared/misc.h"
 
-struct request_response_combiner_t : public page_container_t
+struct request_response_combiner_t : public request_listener_t
 {
 	~request_response_combiner_t()
 	{
@@ -20,13 +20,19 @@ struct request_response_combiner_t : public page_container_t
 
 	void print(const request_ptr &req, const response_ptr &res)
 	{
-		printf("%d %s %s %s (%ld bytes postdata and %ld bytes response)\n",
+		std::string response = to_str(res->bodysize) + " bytes response";
+		if (req->bodysize)
+			response = to_str(req->bodysize) + " bytes postdata, " + response;
+		if (!req->complete || !res->complete)
+			response += ", some data missing";
+		if (!req->tcp_stream_ok || !res->tcp_stream_ok)
+			response += ", PACKETLOSS";
+		printf("%d %s %s %s (%s)\n",
 				res->status,
 				req->method_str(),
 				req->header_first("Host", "unknownhost").c_str(),
 				req->url.c_str(),
-				req->bodysize,
-				res->bodysize);
+				response.c_str());
 	}
 
 	void add_request(const request_ptr &req)
@@ -116,7 +122,7 @@ int main(int argc, char *argv[])
 		std::string device = "any";
 		if (!positional.empty())
 			device = positional[0];
-		burl.read_live_capture(device, filter);
+		burl.live_capture(device, filter);
 	}
 }
 catch(const std::exception &e)
