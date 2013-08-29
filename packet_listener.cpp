@@ -13,8 +13,8 @@ static int FUNC(http_parser *parser) \
 FORWARD_DATA(on_url)
 FORWARD_DATA(on_header_field)
 FORWARD_DATA(on_header_value)
+FORWARD_NOTIFICATION(on_headers_complete)
 FORWARD_DATA(on_body)
-//FORWARD_NOTIFICATION(on_headers_complete)
 FORWARD_NOTIFICATION(on_message_begin)
 FORWARD_NOTIFICATION(on_status_complete)
 FORWARD_NOTIFICATION(on_message_complete)
@@ -31,8 +31,8 @@ burl_packet_listener_t::burl_packet_listener_t(
 	d_httpsettings->on_url = ::on_url;
 	d_httpsettings->on_header_field = ::on_header_field;
 	d_httpsettings->on_header_value = ::on_header_value;
+	d_httpsettings->on_headers_complete = ::on_headers_complete;
 	d_httpsettings->on_body = ::on_body;
-	//d_httpsettings->on_headers_complete = ::on_headers_complete;
 	d_httpsettings->on_message_begin = ::on_message_begin;
 	d_httpsettings->on_message_complete = ::on_message_complete;
 	d_httpsettings->on_status_complete = ::on_status_complete;

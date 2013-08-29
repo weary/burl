@@ -35,6 +35,7 @@ struct stream_t :
 	int on_url(const char *at, size_t length);
 	int on_header_field(const char *at, size_t length);
 	int on_header_value(const char *at, size_t length);
+	int on_headers_complete();
 	int on_body(const char *at, size_t length);
 	int on_status_complete();
 	int on_message_begin();
@@ -55,12 +56,14 @@ protected:
 	enum { stream_unknown, stream_partial, stream_ok } d_stream_state = stream_unknown;
 	// partial means we missed packets somewhere
 
-	std::string d_field; // for http-headers
+	enum { reading_idle, reading_field, reading_value } d_headerstate = reading_idle;
+	std::string d_field, d_value; // for http-headers
 
 	request_ptr d_current_request;
 	response_ptr d_current_response;
 
 	void reset_http_parser();
+	int have_headerpair();
 
 	bool is_request() const;
 	request_or_response_t *cur();

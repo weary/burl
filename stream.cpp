@@ -110,17 +110,39 @@ int stream_t::on_url(const char *at, size_t length)
 	return 0;
 }
 
+int stream_t::have_headerpair()
+{
+	cur()->headers.push_back(
+			request_or_response_t::headerpair_t(d_field, d_value));
+	d_field.clear();
+	d_value.clear();
+	d_headerstate = reading_idle;
+	return 0;
+}
+
 int stream_t::on_header_field(const char *at, size_t length)
 {
-	d_field.assign(at, length);
+	if (d_headerstate == reading_value)
+		have_headerpair();
+	d_headerstate = reading_field;
+
+	d_field.append(at, length);
 	return 0;
 }
 
 int stream_t::on_header_value(const char *at, size_t length)
 {
-	typedef request_or_response_t::headerpair_t headerpair_t;
-	cur()->headers.push_back(
-			headerpair_t(d_field, std::string(at, length)));
+	assert(d_headerstate != reading_idle);
+	d_headerstate = reading_value;
+
+	d_value.append(at, length);
+	return 0;
+}
+
+int stream_t::on_headers_complete()
+{
+	if (d_headerstate != reading_idle)
+		have_headerpair();
 	return 0;
 }
 
