@@ -1,0 +1,17 @@
+Combine tcp-reassembly and joyent's http parser in one handy library
+
+The profided example outputs requests and responses:
+$ sudo ./burl_test --live --bpf 'port 80' eth0
+301 GET ftp.snt.utwente.nl /pub/linux/gentoo/releases/x86/current-iso (360 bytes response)
+200 GET ftp.snt.utwente.nl /pub/linux/gentoo/releases/x86/current-iso/ (5766 bytes response)
+200 GET ftp.snt.utwente.nl /icons/small/generic.gif (116 bytes response)
+200 GET www.snt.utwente.nl /logo/logo.php?style=2;text=FTP%20Service (2835 bytes response)
+200 GET ftp.snt.utwente.nl /bwbar/ubar.png (114 bytes response)
+200 ?   (request missing, 15 bytes response, packetloss in response stream)
+200 GET notify6.dropbox.com /subscribe?host_int=... (15 bytes response, packetloss in request and response stream)
+301 GET ftp.snt.utwente.nl /pub/linux/gentoo/releases/x86/current-iso/hardened (369 bytes response)
+200 GET ftp.snt.utwente.nl /pub/linux/gentoo/releases/x86/current-iso/hardened/ (3769 bytes response)
+200 GET ftp.snt.utwente.nl /bwbar/ubar.png (114 bytes response)
+200 GET ftp.snt.utwente.nl /pub/linux/gentoo/releases/x86/current-iso/install-x86-minimal-20130820.iso (7978891 bytes response, response not complete)
+
+

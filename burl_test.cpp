@@ -1,7 +1,17 @@
 #include "burl.h"
 #include <unordered_map>
 #include <list>
+#include <boost/algorithm/string/join.hpp>
 #include "shared/misc.h"
+
+inline bool operator >(const timeval &l, const timeval &r)
+{
+	if (l.tv_sec > r.tv_sec)
+		return true;
+	else if (l.tv_sec < r.tv_sec)
+		return false;
+	return l.tv_usec > r.tv_usec;
+}
 
 struct request_response_combiner_t : public request_listener_t
 {
@@ -20,19 +30,39 @@ struct request_response_combiner_t : public request_listener_t
 
 	void print(const request_ptr &req, const response_ptr &res)
 	{
-		std::string response = to_str(res->bodysize) + " bytes response";
-		if (req->bodysize)
-			response = to_str(req->bodysize) + " bytes postdata, " + response;
-		if (!req->complete || !res->complete)
-			response += ", some data missing";
-		if (!req->tcp_stream_ok || !res->tcp_stream_ok)
-			response += ", PACKETLOSS";
+		std::vector<std::string> extra;
+		if (req)
+		{
+			if (req->bodysize)
+				extra.push_back(to_str(req->bodysize) + " bytes postdata");
+			if (!req->complete)
+				extra.push_back("request not complete");
+			else if (!req->tcp_stream_ok && (!res || res->tcp_stream_ok))
+				extra.push_back("packetloss in request stream");
+		}
+		else
+			extra.push_back("request missing");
+
+		if (res)
+		{
+			extra.push_back(to_str(res->bodysize) + " bytes response");
+			if (!res->complete)
+				extra.push_back("response not complete");
+			else if (!res->tcp_stream_ok && (!req || req->tcp_stream_ok))
+				extra.push_back("packetloss in response stream");
+		}
+		else
+			extra.push_back("response missing");
+
+		if (res && req && !res->tcp_stream_ok && !req->tcp_stream_ok)
+			extra.push_back("packetloss in request and response stream");
+
 		printf("%d %s %s %s (%s)\n",
-				res->status,
-				req->method_str(),
-				req->header_first("Host", "unknownhost").c_str(),
-				req->url.c_str(),
-				response.c_str());
+				(res ? res->status : 0),
+				(req ? req->method_str() : "?"),
+				(req ? req->header_first("Host", "unknownhost").c_str() : ""),
+				(req ? req->url.c_str() : ""),
+				boost::algorithm::join(extra, ", ").c_str());
 	}
 
 	void add_request(const request_ptr &req)
@@ -49,7 +79,13 @@ struct request_response_combiner_t : public request_listener_t
 		if (res_iter->second.empty())
 			d_responses.erase(res_iter);
 
-		// FIXME: found request must be before response
+		if (req->timestamp > res->timestamp)  // request after response. rejecting response
+		{
+			print(nullptr, res);
+			add_request(req);
+			return;
+		}
+
 
 		print(req, res);
 	}
@@ -67,8 +103,6 @@ struct request_response_combiner_t : public request_listener_t
 		req_iter->second.pop_front();
 		if (req_iter->second.empty())
 			d_requests.erase(req_iter);
-
-		// FIXME: found request must be before response
 
 		print(req, res);
 	}

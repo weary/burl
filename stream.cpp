@@ -45,12 +45,6 @@ stream_t::~stream_t()
 
 void stream_t::accept_packet(packet_t *packet, int packetloss)
 {
-	if (packet)
-	{
-		printf("stream %d: have packet %d.%06d\n", d_streamid, (unsigned)packet->ts().tv_sec, (unsigned)packet->ts().tv_usec);
-		if (packet->ts().tv_usec == 75494)
-			printf("stream %d: frut\n", d_streamid);
-	}
 	if (d_broken)
 		return;
 
